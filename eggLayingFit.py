@@ -259,7 +259,6 @@ with open(f2name) as parFile:
 			outEgg = odeint(model, state, t,args = (parNew,))
 			plotEgglaying(outEgg,args.model)
 			i = i + 1
-			break
 
 		elif(args.model == '2'):
 			ko,kc,kf,ks = line.rstrip().split(' ')			
@@ -275,7 +274,6 @@ with open(f2name) as parFile:
 			outEgg = odeint(model, state, t,args = (parNew,))
 			plotEgglaying(outEgg,args.model)
 			i = i + 1
-			break
 
 		elif(args.model == '3'):
 			ko,kf = line.rstrip().split(' ')
@@ -287,7 +285,6 @@ with open(f2name) as parFile:
 			outEgg = odeint(model, state, t,args = (parNew,))
 			plotEgglaying(outEgg,args.model)
 			i = i + 1
-			break
 
 		elif(args.model == '4'):
 			ko,kf,ks = line.rstrip().split(' ')
@@ -301,4 +298,3 @@ with open(f2name) as parFile:
 			outEgg = odeint(model, state, t,args = (parNew,))	
 			plotEgglaying(outEgg,args.model)
 			i = i + 1		
-			break
