@@ -8,7 +8,7 @@ import csv
 import argparse
 
 ########################################################################
-##			Command Line Options  			      ## 
+##			             Command Line Options  			              ##
 ########################################################################
 parser = argparse.ArgumentParser(description=
 'This is a script to simulate and solve egglaying models in C.elegans')
@@ -26,7 +26,7 @@ print "Delta_t = %s" % args.time
 
 ########################################################################
 ##          Egglaying Models, take in globals containing state and    ##
-##			the parameters to the model equations	      ##		  ##							              ##			
+##			the parameters to the model equations	      		      ##
 ########################################################################
 
 ## Model1
@@ -49,7 +49,7 @@ def egglayingModel1(stateVar,t,params):
 
 ## Model2
 def egglayingModel2(stateVar,t,params):
-	## dE = min(kf*O,ks*S)
+        ## dE = min(kf*O,ks*S)
     	## dS = -dE
     	## dO = ko - kc*O - dE
     	S = stateVar[0]
@@ -68,9 +68,9 @@ def egglayingModel2(stateVar,t,params):
 
 ## Model3
 def egglayingModel3(state,t,params):
-    	## dE = kf*O*S
-    	## dS = -dE
-    	## dO = ko - dE
+    ## dE = kf*O*S
+    ## dS = -dE
+    ## dO = ko - dE
 	S = stateVar[0]
 	O = stateVar[1]
 	E = stateVar[3]
@@ -102,7 +102,7 @@ def egglayingModel4(state,t,params):
 	return [dS,dO,dE]
 	
 ########################################################################
-##			     FIT FUNCTION 			      ##
+##			                  FIT FUNCTION 			                  ##
 ##        The ODE models are called from here,returns residuals	      ##
 ########################################################################
 def residual(params, mod, data):
@@ -117,7 +117,7 @@ def residual(params, mod, data):
 	return res
 
 ########################################################################
-##			     PLOT FUNCTION			      ##
+##			                 PLOT FUNCTION			                  ##
 ########################################################################
 def plotEgglaying(output,mod):
 	## Plot the results
@@ -142,7 +142,7 @@ def plotEgglaying(output,mod):
 		O = output[:,1]
 		eggRate = np.minimum(kf*O,ks*S)
 		plt.plot(t, eggRate, label='dE/dt')
-		#plt.plot(t, O, label='Oocytes')
+		plt.plot(expTimes, expPoints[i], label='Experimental Data')
 		#plt.plot(t, E, label='Eggs')
 		plt.title('Egglaying Dynamics-C.elegans')
 		plt.legend(loc=0)
@@ -163,7 +163,7 @@ def plotEgglaying(output,mod):
 		plt.savefig(fname)
 
 ########################################################################
-##			     MAIN FUNCTION                            ##
+##			                 MAIN FUNCTION                            ##
 ########################################################################
 
 ## Experimental File Input
@@ -218,15 +218,15 @@ i = 0
 #out1 = open("Report_Model%s.txt","a") %args.model
 f2name = "Parameters_Model%s.txt" % args.model
 out2 = open(f2name,"a")
-
+expPoints = np.array()
 for row in csv_f:
 	## Skipping first row as it has the headers
 	if(i > 0):
 		## Skipping first column as it has strain information
 		e = np.array(row[1:6])
-		expPoints = e.astype(np.float)
+		expPoints[i] = e.astype(np.float)
 		## Call the lmfit's minimize function
-		val = minimize(residual, par, args=(model,expPoints))
+		val = minimize(residual, par, args=(model,expPoints[i]))
 		#print >> out1, report_fit(par)
 		## Write the fitted parameters to a file 
 		if(args.model == '1'):
@@ -298,3 +298,4 @@ with open(f2name) as parFile:
 			outEgg = odeint(model, state, t,args = (parNew,))	
 			plotEgglaying(outEgg,args.model)
 			i = i + 1		
+			end
