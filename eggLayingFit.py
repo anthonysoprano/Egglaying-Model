@@ -1,5 +1,5 @@
 ## Loading the required libraries
-from lmfit import minimize, Parameters, Parameter,report_fit
+from lmfit import minimize, Parameters, Parameter,fit_report
 from scipy.integrate import odeint
 from scipy.optimize import leastsq
 import matplotlib.pyplot as plt
@@ -20,7 +20,7 @@ parser.add_argument('-m','--model',help='Model No.(integer)(1/2/3/4)'
 parser.add_argument('-t','--time',help='Time Interval(delta_t) for the model'
 					, required=True)
 args = parser.parse_args()
-print "Experimental Data File: %s" % args.input 
+print "Experimental Data File: %s" %(args.input)
 print "Model No. Used: %s" % args.model 
 print "Delta_t = %s" % args.time
 
@@ -148,6 +148,15 @@ def plotEgglaying(output,mod):
 	ptitle = "%s" %(expStrains[i])
 	plt.title(ptitle)
 	plt.legend(loc=0)
+	
+	## Residuals
+	eTimes = np.asarray(expTimes)
+	index = np.ndarray(shape = (5,),dtype = int)
+	np.around(eTimes/delta_t,out = index)
+	modRes = eggRate[index] - expPoints[i,0:5]
+	modSqres = np.sum(modRes*modRes)
+	print >> resFile, expStrains[i],"\t",modRes,"\t", modSqres
+	
 
 ########################################################################
 ##			     MAIN FUNCTION                            ##
@@ -170,16 +179,16 @@ par= Parameters()
 if(args.model == '1'):
 	## Parameters Model1  
 	par.add('kg',value = 12)
-	par.add('ks',value = 0)
+	par.add('ks',value = 0,min = 0)
 	par.add('ko',value = 0.01)
 	model = egglayingModel1
 	
 elif(args.model == '2'):
 	## Parameters Model2
-	par.add('ko',value = 12)
-	par.add('kc',value = 0)
+	par.add('ko',value = 12,max = 100)
+	par.add('kc',value = 0,min = 0)
 	par.add('kf',value = 0.1)
-	par.add('ks',value = 0.1)
+	par.add('ks',value = 0.1,max = 2)
 	model = egglayingModel2
 	
 elif(args.model == '3'):
@@ -235,7 +244,9 @@ parOut.close()
 
 fitPar = np.loadtxt(parFilename,delimiter=" ")
 parFitFilename = "Parameters_Model%s_Fitted.txt" % args.model
+reportFilename = "Parameters_Model%s_Report.txt" % args.model
 parOut = open(parFitFilename,"a")
+report = open(reportFilename,"a")
 
 ## Fitting the parameters again, some are taken as constants(after averaging them) 
 
@@ -267,11 +278,12 @@ for i in range(1,97):
 		val = minimize(residual, parFit, args=(model,expPoints))
 		#print >> out1, report_fit(par)
 		print >> parOut, parFit['kg'].value,"\t",parFit['ks'].value,"\t",parFit['ko'].value
+		print >> report, fit_report(par)
 		
 	elif(args.model == '2'):
 		parFit.add('ko',value = fitPar[i-1,0])
-		parFit.add('ks',value = ks,vary = False)
-		parFit.add('kf',value = kf,vary = False)
+		parFit.add('ks',value = ks,vary = True)
+		parFit.add('kf',value = kf,vary = True)
 		parFit.add('kc',value = fitPar[i-1,1])
 		## Call the lmfit's minimize function
 		val = minimize(residual, parFit, args=(model,expPoints))
@@ -292,10 +304,14 @@ for i in range(1,97):
 		val = minimize(residual, parFit, args=(model,expPoints))
 		print >> parOut, par['ko'].value,"\t",par['kf'].value,"\t",par['ks'].value
 
+
+report.close()
 parOut.close()
 i = 1
 j = 1
 k = 1
+resFilename = "Parameters_Model%s_Residuals.txt" % args.model
+resFile = open(resFilename,"a")
 ## Read the parameters file which was created earlier 
 with open(parFitFilename) as parFitFile:
 	for line in parFitFile:
@@ -353,6 +369,7 @@ with open(parFitFilename) as parFitFile:
 			fname = "Plot_Model%s_Strain_%stoStrain_%s" %(args.model,expStrains[i],expStrains[i+7])
 			j = j + 1
 			k = 1
+		
 
 		subName = "24%i" %(k)
 		subName = int(subName)
@@ -362,5 +379,5 @@ with open(parFitFilename) as parFitFile:
 		i = i + 1
 		k = k + 1
 
-
+resFile.close()
 
