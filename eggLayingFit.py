@@ -8,7 +8,7 @@ import csv
 import argparse
 
 ########################################################################
-##			             Command Line Options  			              ##
+##			Command Line Options  			      ## 
 ########################################################################
 parser = argparse.ArgumentParser(description=
 'This is a script to simulate and solve egglaying models in C.elegans')
@@ -26,7 +26,7 @@ print "Delta_t = %s" % args.time
 
 ########################################################################
 ##          Egglaying Models, take in globals containing state and    ##
-##			the parameters to the model equations	      		      ##
+##			the parameters to the model equations	      ##		  ##							              ##			
 ########################################################################
 
 ## Model1
@@ -49,7 +49,7 @@ def egglayingModel1(stateVar,t,params):
 
 ## Model2
 def egglayingModel2(stateVar,t,params):
-        ## dE = min(kf*O,ks*S)
+	## dE = min(kf*O,ks*S)
     	## dS = -dE
     	## dO = ko - kc*O - dE
     	S = stateVar[0]
@@ -67,13 +67,13 @@ def egglayingModel2(stateVar,t,params):
     	return [dS,dO,dE]
 
 ## Model3
-def egglayingModel3(state,t,params):
-    ## dE = kf*O*S
-    ## dS = -dE
-    ## dO = ko - dE
+def egglayingModel3(stateVar,t,params):
+    	## dE = kf*O*S
+    	## dS = -dE
+    	## dO = ko - dE
 	S = stateVar[0]
 	O = stateVar[1]
-	E = stateVar[3]
+	E = stateVar[2]
 	ko = params['ko'].value
 	kf = params['kf'].value
 	
@@ -84,13 +84,13 @@ def egglayingModel3(state,t,params):
 	return [dS,dO,dE]	
    
 ## Model4
-def egglayingModel4(state,t,params):
+def egglayingModel4(stateVar,t,params):
 	## dE = min(kf*O,ks*S)
 	## dS = -dE
 	## dO = ko - dE
 	S = stateVar[0]
 	O = stateVar[1]
-	E = stateVar[3]
+	E = stateVar[2]
 	ko = params['ko'].value
 	kf = params['kf'].value
 	ks = params['ks'].value
@@ -102,7 +102,7 @@ def egglayingModel4(state,t,params):
 	return [dS,dO,dE]
 	
 ########################################################################
-##			                  FIT FUNCTION 			                  ##
+##			     FIT FUNCTION 			      ##
 ##        The ODE models are called from here,returns residuals	      ##
 ########################################################################
 def residual(params, mod, data):
@@ -113,57 +113,44 @@ def residual(params, mod, data):
 	np.around(eTimes/delta_t,out = index)
 	mod = (E[index] - E[index-1])/delta_t
 	modEggRate = np.array(mod,dtype = float)
-	res = expPoints - modEggRate
+	res = expPoints[i,:] - modEggRate
 	return res
 
 ########################################################################
-##			                 PLOT FUNCTION			                  ##
+##			     PLOT FUNCTION			      ##
 ########################################################################
 def plotEgglaying(output,mod):
-	## Plot the results
-	plt.figure()
+	
 	if(args.model == '1'):
 	## Model 1 Plot : dE/dt = ko*O*S
 		S = output[:,0]
 		O = output[:,1]
 		eggRate = ko*O*S
-		plt.plot(t, eggRate, label='dE/dt')
-		#plt.plot(t, O, label='Oocytes')
-		#plt.plot(t, E, label='Eggs')
-		plt.title('Egglaying Dynamics-C.elegans')
-		plt.legend(loc=0)
-		#plt.show()
-		fname = "Plot_Model%s_Strain%i" %(args.model,i)
-		plt.savefig(fname)
 
 	elif(args.model == '2' or args.model == '4'):
 	## Model 2/4 Plot : dE/dt = min(kf*O,ks*S)
 		S = output[:,0]
 		O = output[:,1]
 		eggRate = np.minimum(kf*O,ks*S)
-		plt.plot(t, eggRate, label='dE/dt')
-		plt.plot(expTimes, expPoints[i], label='Experimental Data')
-		#plt.plot(t, E, label='Eggs')
-		plt.title('Egglaying Dynamics-C.elegans')
-		plt.legend(loc=0)
-		fname = "Plot_Model%s_Strain%i" %(args.model,i)
-		plt.savefig(fname)
 	
 	elif(args.model == '3'):
 	## Model 3 Plot : dE/dt = kf*O*S
 		S = output[:,0]
 		O = output[:,1]
 		eggRate = kf*O*S
-		plt.plot(t, eggRate, label='dE/dt')
-		#plt.plot(t, O, label='Oocytes')
-		#plt.plot(t, E, label='Eggs')
-		plt.title('Egglaying Dynamics-C.elegans')
-		plt.legend(loc=0)
-		fname = "Plot_Model%s_Strain%i" %(args.model,i)
-		plt.savefig(fname)
+
+	## Plot the Egglaying Rate
+	plt.subplot(subName)
+	plt.plot(t, eggRate)
+	plt.plot(expTimes, expPoints[i,0:5], marker = "o",linestyle = "--")
+	plt.xlabel('Time(in hrs)')
+	plt.ylabel('dE/dt')
+	ptitle = "%s" %(expStrains[i])
+	plt.title(ptitle)
+	plt.legend(loc=0)
 
 ########################################################################
-##			                 MAIN FUNCTION                            ##
+##			     MAIN FUNCTION                            ##
 ########################################################################
 
 ## Experimental File Input
@@ -216,36 +203,102 @@ i = 0
 
 ## File handles for the summary and parameter files
 #out1 = open("Report_Model%s.txt","a") %args.model
-f2name = "Parameters_Model%s.txt" % args.model
-out2 = open(f2name,"a")
-expPoints = np.array()
+parFilename = "Parameters_Model%s.txt" % args.model
+parOut = open(parFilename,"a")
+expPoints = np.zeros(shape=(97,5))
+expStrains = np.zeros(shape=(97),dtype="S10")
 for row in csv_f:
 	## Skipping first row as it has the headers
 	if(i > 0):
 		## Skipping first column as it has strain information
 		e = np.array(row[1:6])
-		expPoints[i] = e.astype(np.float)
+		expPoints[i,0:5] = e.astype(np.float)
+		## Storing first column(strain information) 
+		expStrains[i] = row[0]
+		print expStrains[i]	
 		## Call the lmfit's minimize function
-		val = minimize(residual, par, args=(model,expPoints[i]))
+		val = minimize(residual, par, args=(model,expPoints))
 		#print >> out1, report_fit(par)
 		## Write the fitted parameters to a file 
 		if(args.model == '1'):
-			print >> out2, par['kg'].value,"\t",par['ks'].value,"\t",par['ko'].value
+			print >> parOut, par['kg'].value,"\t",par['ks'].value,"\t",par['ko'].value
 		elif(args.model == '2'):
-			print >> out2, par['ko'].value,"\t",par['kc'].value,"\t",par['kf'].value,"\t",par['ks'].value
+			print >> parOut, par['ko'].value,"\t",par['kc'].value,"\t",par['kf'].value,"\t",par['ks'].value
 		elif(args.model == '3'):
-			print >> out2, par['ko'].value,"\t",par['kf'].value
+			print >> parOut, par['ko'].value,"\t",par['kf'].value
 		elif(args.model == '4'):
-			print >> out2, par['ko'].value,"\t",par['kf'].value,"\t",par['ks'].value
+			print >> parOut, par['ko'].value,"\t",par['kf'].value,"\t",par['ks'].value
 	i = i + 1
 
 #out1.close()
-out2.close()
+parOut.close()
 
+fitPar = np.loadtxt(parFilename,delimiter=" ")
+parFitFilename = "Parameters_Model%s_Fitted.txt" % args.model
+parOut = open(parFitFilename,"a")
+
+## Fitting the parameters again, some are taken as constants(after averaging them) 
+
+## Average out and keep some parameters constant
+if(args.model == '1'):
+	ks = np.average(fitPar[:,1])
+	ko = np.average(fitPar[:,2])
+
+if(args.model == '2'):
+	kf = np.average(fitPar[:,2])
+	ks = np.average(fitPar[:,3])
+
+if(args.model == '3'):
+	kf = np.average(fitPar[:,1])
+
+if(args.model == '4'):
+	kf = np.average(fitPar[:,1])
+	ks = np.average(fitPar[:,2])
+
+## Do the fit again with the new parameter set
+for i in range(1,97):
+	parFit = Parameters()	
+	## Write the fitted parameters to a file 
+	if(args.model == '1'):	
+		parFit.add('kg',value = fitPar[i-1,0])
+		parFit.add('ks',value = ks,vary = False)
+		parFit.add('ko',value = ko,vary = False) 
+		## Call the lmfit's minimize function
+		val = minimize(residual, parFit, args=(model,expPoints))
+		#print >> out1, report_fit(par)
+		print >> parOut, parFit['kg'].value,"\t",parFit['ks'].value,"\t",parFit['ko'].value
+		
+	elif(args.model == '2'):
+		parFit.add('ko',value = fitPar[i-1,0])
+		parFit.add('ks',value = ks,vary = False)
+		parFit.add('kf',value = kf,vary = False)
+		parFit.add('kc',value = fitPar[i-1,1])
+		## Call the lmfit's minimize function
+		val = minimize(residual, parFit, args=(model,expPoints))
+		print >> parOut, par['ko'].value,"\t",par['kc'].value,"\t",par['kf'].value,"\t",par['ks'].value
+
+	elif(args.model == '3'):
+		parFit.add('ko',value = fitPar[i-1,0])
+		parFit.add('kf',value = kf,vary = False)
+		## Call the lmfit's minimize function
+		val = minimize(residual, parFit, args=(model,expPoints))
+		print >> parOut, par['ko'].value,"\t",par['kf'].value
+
+	elif(args.model == '4'):
+		## Call the lmfit's minimize function
+		parFit.add('ko',value = fitPar[i-1,0])
+		parFit.add('kf',value = kf,vary = False)
+		parFit.add('ks',value = ks,vary = False)
+		val = minimize(residual, parFit, args=(model,expPoints))
+		print >> parOut, par['ko'].value,"\t",par['kf'].value,"\t",par['ks'].value
+
+parOut.close()
 i = 1
+j = 1
+k = 1
 ## Read the parameters file which was created earlier 
-with open(f2name) as parFile:
-	for line in parFile:
+with open(parFitFilename) as parFitFile:
+	for line in parFitFile:
 		if(args.model == '1'):
 			kg,ks,ko = line.rstrip().split(' ')
 			kg = float(kg)
@@ -257,8 +310,7 @@ with open(f2name) as parFile:
 			parNew.add('ks',value = ks)
 			parNew.add('ko',value = ko)
 			outEgg = odeint(model, state, t,args = (parNew,))
-			plotEgglaying(outEgg,args.model)
-			i = i + 1
+
 
 		elif(args.model == '2'):
 			ko,kc,kf,ks = line.rstrip().split(' ')			
@@ -272,8 +324,7 @@ with open(f2name) as parFile:
 			parNew.add('kf',value = kf)
 			parNew.add('ks',value = ks)
 			outEgg = odeint(model, state, t,args = (parNew,))
-			plotEgglaying(outEgg,args.model)
-			i = i + 1
+
 
 		elif(args.model == '3'):
 			ko,kf = line.rstrip().split(' ')
@@ -283,8 +334,7 @@ with open(f2name) as parFile:
 			parNew.add('ko',value = ko)
 			parNew.add('kf',value = kf)
 			outEgg = odeint(model, state, t,args = (parNew,))
-			plotEgglaying(outEgg,args.model)
-			i = i + 1
+
 
 		elif(args.model == '4'):
 			ko,kf,ks = line.rstrip().split(' ')
@@ -296,6 +346,21 @@ with open(f2name) as parFile:
 			parNew.add('kf',value = kf)
 			parNew.add('ks',value = ks)
 			outEgg = odeint(model, state, t,args = (parNew,))	
-			plotEgglaying(outEgg,args.model)
-			i = i + 1		
-			end
+
+		### Call the Plot Function; plot and subplot numbering,file naming and saving occurs globally 
+		if(i%8 == 1):
+			plt.figure(j,figsize=(15,10))
+			fname = "Plot_Model%s_Strain_%stoStrain_%s" %(args.model,expStrains[i],expStrains[i+7])
+			j = j + 1
+			k = 1
+
+		subName = "24%i" %(k)
+		subName = int(subName)
+		plotEgglaying(outEgg,args.model)
+		if(i%8 == 0):
+			plt.savefig(fname)
+		i = i + 1
+		k = k + 1
+
+
+
