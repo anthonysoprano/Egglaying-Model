@@ -26,7 +26,7 @@ print "Delta_t = %s" % args.time
 
 ########################################################################
 ##          Egglaying Models, take in globals containing state and    ##
-##			the parameters to the model equations	      ##		  ##							              ##			
+##		   the parameters to the model equations	      ##		  			##                                                   		      ##	
 ########################################################################
 
 ## Model1
@@ -156,6 +156,7 @@ def plotEgglaying(output,mod):
 	modRes = eggRate[index] - expPoints[i,0:5]
 	modSqres = np.sum(modRes*modRes)
 	print >> resFile, expStrains[i],"\t",modRes,"\t", modSqres
+	return modSqres
 	
 
 ########################################################################
@@ -178,41 +179,41 @@ state = [S0,O0,E0]
 par= Parameters()
 if(args.model == '1'):
 	## Parameters Model1  
-	par.add('kg',value = 12)
-	par.add('ks',value = 0,min = 0)
-	par.add('ko',value = 0.01)
+	par.add('kg',value = 12,max = 30,min=5)
+	par.add('ks',value = 0.01,min = -0.1,max = 0.1)
+	par.add('ko',value = 0.01,max = 0.01)
 	model = egglayingModel1
 	
 elif(args.model == '2'):
 	## Parameters Model2
-	par.add('ko',value = 12,max = 100)
-	par.add('kc',value = 0,min = 0)
-	par.add('kf',value = 0.1)
-	par.add('ks',value = 0.1,max = 2)
+	par.add('ko',value = 12,min = 6,max = 15)
+	par.add('kc',value = 0.01)
+	par.add('kf',value = 0.01)
+	par.add('ks',value = 0.01,min = 0.1)
 	model = egglayingModel2
 	
 elif(args.model == '3'):
 	## Parameters Model3
-	par.add('ko',value = 12)
+	par.add('ko',value = 12,max = 15)
 	par.add('kf',value = 0.01)
 	model = egglayingModel3
 	
 elif(args.model == '4'):
 	## Parameters Model4
-	par.add('ko',value = 12)
+	par.add('ko',value = 6,max = 10)
 	par.add('kf',value = 0.1)
-	par.add('ks',value = 0.1)
+	par.add('ks',value = 0.1,min = 0.1)
 	model = egglayingModel4
 
 ## Time Gird
 delta_t = float(args.time) 
-t = np.arange(0,96,delta_t)
+t = np.arange(0,97,delta_t)
 
 i = 0
 
 ## File handles for the summary and parameter files
 #out1 = open("Report_Model%s.txt","a") %args.model
-parFilename = "Parameters_Model%s.txt" % args.model
+parFilename = "Parameters_Model%s_deltaT%s.txt" %(args.model,args.time)
 parOut = open(parFilename,"a")
 expPoints = np.zeros(shape=(97,5))
 expStrains = np.zeros(shape=(97),dtype="S10")
@@ -226,7 +227,7 @@ for row in csv_f:
 		expStrains[i] = row[0]
 		print expStrains[i]	
 		## Call the lmfit's minimize function
-		val = minimize(residual, par, args=(model,expPoints))
+		val = minimize(residual, par, args=(model,expPoints),full_output=1)
 		#print >> out1, report_fit(par)
 		## Write the fitted parameters to a file 
 		if(args.model == '1'):
@@ -243,11 +244,11 @@ for row in csv_f:
 parOut.close()
 
 fitPar = np.loadtxt(parFilename,delimiter=" ")
-parFitFilename = "Parameters_Model%s_Fitted.txt" % args.model
-reportFilename = "Parameters_Model%s_Report.txt" % args.model
+parFitFilename = "Parameters_Model%s_deltaT%s_Fitted.txt" %(args.model,args.time)
+reportFilename = "Parameters_Model%s_deltaT%s_Report.txt" %(args.model,args.time)
 parOut = open(parFitFilename,"a")
 report = open(reportFilename,"a")
-
+'''
 ## Fitting the parameters again, some are taken as constants(after averaging them) 
 
 ## Average out and keep some parameters constant
@@ -307,13 +308,15 @@ for i in range(1,97):
 
 report.close()
 parOut.close()
+'''
 i = 1
 j = 1
 k = 1
-resFilename = "Parameters_Model%s_Residuals.txt" % args.model
+resFilename = "Parameters_Model%s_deltaT%s_Residuals.txt" %(args.model,args.time)
 resFile = open(resFilename,"a")
+ssq = 0 
 ## Read the parameters file which was created earlier 
-with open(parFitFilename) as parFitFile:
+with open(parFilename) as parFitFile:
 	for line in parFitFile:
 		if(args.model == '1'):
 			kg,ks,ko = line.rstrip().split(' ')
@@ -373,11 +376,12 @@ with open(parFitFilename) as parFitFile:
 
 		subName = "24%i" %(k)
 		subName = int(subName)
-		plotEgglaying(outEgg,args.model)
+		ssq = ssq + plotEgglaying(outEgg,args.model)
 		if(i%8 == 0):
 			plt.savefig(fname)
 		i = i + 1
 		k = k + 1
 
+print >> resFile, ssq
 resFile.close()
 
