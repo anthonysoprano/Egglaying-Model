@@ -36,13 +36,20 @@ egglayingModel1 = function(t,stateVar,parVar)
 
 # Model 2 
 
-egglayingModel2 = function(t,stateVar,parVar)
+egglayingModel2 = function(t,stateVar,parVar,flag=0)
         ## dE = min(kf*O,ks*S)
         ## dS = -dE
         ## dO = ko - kc*O - dE
         ## parVar = [kf,ks,ko,kc]
 {
-        with(as.list(c(stateVar,parVar)),
+        ko = parVar[1]
+        if(flag == 0)
+        {    
+                kc = parVar[2]
+                kf = parVar[3]
+                ks = parVar[4]
+        }
+        with(as.list(stateVar),
 {
         dE = min(kf*O,ks*S)
         dS = -dE
@@ -53,13 +60,18 @@ egglayingModel2 = function(t,stateVar,parVar)
 
 # Model 3 
 
-egglayingModel3 = function(t,stateVar,parVar) 
+egglayingModel3 = function(t,stateVar,parVar,flag=0) 
         ## dE = kf*O*S
         ## dS = -dE
         ## dO = ko - dE
         ## parVar = [ko,kf]
 {
-        with(as.list(c(stateVar,parVar)),
+        ko = parVar[1]
+        if(flag == 0)
+        {
+                kf = parVar[2]
+        }
+        with(as.list(stateVar),
 {
         dE = kf*O*S
         dS = -dE
@@ -86,7 +98,7 @@ egglayingModel4 = function(t,stateVar,parVar)
 }
 
 ######################################### The Fit Function ################################################
-residualsModel = function(params, model)
+residualsModel = function(params, model,flag=0)
 {       # This function is used by nls.lm to calculate the residuals for a given set of parameters. params is a list/vector
         # of parameters. Model is the function that contains the info for the egg-laying model. The parameters passed to this
         # function must be appropriate for the given model. 
@@ -94,7 +106,7 @@ residualsModel = function(params, model)
         ## Solve the ODEs
         # state is a global variable containing the initial values of the state variables. Times is a global variable containing 
         # all of the times to solve for.
-        out = ode(y = state, times = times, func = model, parms = params, method = solver)
+        out = ode(y = state, times = times, func = model, parms = params, method = solver,flag)
         expEggs = c(mydata1[i,]$T1,mydata1[i,]$T2,mydata1[i,]$T3,mydata1[i,]$T4,mydata1[i,]$T5)
         modEggs = (out[round(e_times/delta_t), "E"]-out[round(e_times/delta_t)-1, "E"])/delta_t
         res = modEggs-expEggs
@@ -113,7 +125,7 @@ printResult = function(params, model,modelFit)
         if(i%%24 == 1)
         {
                 #x11()
-                file = sprintf("Plot_Model_%i_Strain_%stoStrain_%s.pdf",choice,rownames(mydata1[i]),rownames(mydata1)[i+23])
+                file = sprintf("Plot_Model_%i_Strain_%stoStrain_%s.pdf",choice,rownames(mydata1)[i],rownames(mydata1)[i+23])
                 pdf(file,width = 12)
                 par(mfrow=c(4,6))
         }
@@ -222,10 +234,10 @@ solver = as.character(solver)
 start = proc.time()
 
 ## Read the Experimental data file ####
-#mydata1 = read.csv(file.choose(),header = TRUE,row.names=1)
+mydata1 = read.csv(file.choose(),header = TRUE,row.names=1)
 
 ## No. of Strains
-num_strains = 24
+num_strains = 96
 ## Initialize State Variables
 state = c(S=300,O=0,E=0)
 ## Set up the time interval for the experiment
@@ -253,7 +265,7 @@ if(choice == 1)
                 params.fittedModel1 = nls.lm(par = parametersModel1, fn = residualsModel, lower = NULL, upper = NULL, jac = NULL, control=c(maxiter=1000), egglayingModel1)
                 parest = coef(params.fittedModel1)
                 #print(parest)
-                pkg = append(pkg,parest[kg])
+                pkg = append(pkg,parest[[1]])
                 params_ks[i] = parest[[2]]
                 params_ko[i] = parest[[3]]
 
@@ -261,12 +273,12 @@ if(choice == 1)
         ## Average some parameters
         ks = mean(params_ks)
         ko = mean(params_ko)
-        
+        fl = 1
         ## Do the fit again, note : par is the new parameter variable, it excludes the above variables
         for(i in 1:num_strains)
         {
                 parFree = pkg[i]
-                params.fittedModel1 = nls.lm(par = parFree, fn = residualsModel, lower = NULL, upper = NULL, jac = NULL, control=c(maxiter=1000), egglayingModel1)
+                params.fittedModel1 = nls.lm(par = parFree, fn = residualsModel, lower = NULL, upper = NULL, jac = NULL, control=c(maxiter=1000), egglayingModel1,fl)
                 parest = coef(params.fittedModel1)
                 params_kg[i] = parest[[1]]
                 output = printResult(parest,egglayingModel1,params.fittedModel1)
@@ -327,10 +339,11 @@ if(choice == 3)
         params_ko = rep(0,times = 96)
         params_kf = rep(0,times = 96)
         lower_p = c(0,0.0001)
-        upper_p = c(100,0.1)
+        upper_p = c(15,0.1)
+        fl = 1
         for(i in 1:num_strains)
         {
-                params.fittedModel3 = nls.lm(par = parametersModel3, fn = residualsModel, lower = NULL, upper = NULL, jac = NULL, control=c(maxiter=1000), egglayingModel3)
+                params.fittedModel3 = nls.lm(par = parametersModel3, fn = residualsModel, lower = lower_p, upper = upper_p, jac = NULL, control=c(maxiter=1000), egglayingModel3,fl)
                 parest = coef(params.fittedModel3)
                 pko = append(pko,parest[[1]])
                 params_kf[i] = parest[[2]]
