@@ -1,6 +1,4 @@
 # Todo list
-# 1. Add capability to QTL function to output a log file containing the model, parameter info, integrator, delta_t, total residuals
-# 2. Add capability to QTL function to output pdfs of fit with data (similar to R function) with 16 graphs per pdf
 # 3. Add a function to do an SVD on the data which can be output as a QTL file for mapping
 # 4. Troubleshoot model 2. Is it accurate or not?
 
@@ -64,21 +62,19 @@ def egglayingModel2(t,stateVar,params):
 	return diffs
 
 
-
-
-
 ########################################################################
 ##			     FIT FUNCTIONS			      ##
 ##        The ODE numerical differentiators and analytical functions  ##
 ##        are called from here, returns residuals                     ## 
 ########################################################################
-def residual_numerical(params, model_function, data, integrator, delta_t):
+def residual_numerical(params, model_function, data, integrator, delta_t,flag=0):
         # params is a Parameters object, 1 ko per strain. 1 kf, kc, and ks for all strains
         # model_function is a function pointer for egg-laying model
         # data is a dictionary of keys and lists [5 data points] with data['times'] = to the time points of the data
         # inital_states are [S1,O1,E1,S2,O2,E2....SN,ON,EN] where N is >=1
         # integtrator is a type of integrator used by ode
         # delta_t specifies the size of the times step
+	# flag specifies the return value of this function, if 1 it returns the predicted egglaying rate, if 0 then the residuals
 
         initial_states = [params['S0'].value,0,0]
 
@@ -92,6 +88,8 @@ def residual_numerical(params, model_function, data, integrator, delta_t):
         res = []
         pr_data=[]
         guess_data=[]
+
+	pr_dEdt=[]
 
         while r.successful() and r.t < final_t and r.y[0] > .000001:
                 r.integrate(r.t+delta_t)
@@ -108,21 +106,35 @@ def residual_numerical(params, model_function, data, integrator, delta_t):
         num_strains = len(initial_states)/3
         num_data_points = len(data['times'])
         j = 0
-        
+        print "New Function Call !"
         for key in data:
+		print key
                 if key != 'times' :
                         for i in range(0,num_data_points):
                                 time = data['times'][i]
                                 index = int(time/delta_t)
-                                #Assumes that E is third third data point
+                                #Assumes that E is third data point
                                 e_prime = (y[index][j+2] - y[index-1][j+2])/delta_t
                                 pr_data.extend([e_prime])
                                 guess_data.extend([y[index][j]*y[index][j+1]*params['kf'].value])
                                 res.extend([e_prime - data[key][i]])
                         j+=1
 
+	j = 0
+	if(flag == 1):
+	## Return the dE/dt values when called by the plot function
+		time = np.arange(0,96,delta_t)
+		for i in range(0,len(time)):		
+			index = int(time[i]/delta_t)
+			#Assumes that E is third data point
+			dEdt = y[index][j]*y[index][j+1]*params['kf'].value
+			pr_dEdt.extend([dEdt])
+
 #        print guess_data
-	return res
+	if(flag==1):
+		return pr_dEdt
+	else:
+		return res
 
 
 def residual_analytic(params, data):
@@ -208,11 +220,13 @@ def independent_fit_analytic(data, default_parms, int_method) :
 ########################################################################
 def independent_fit(model, data, default_parms, int_method, integrator, delta_t) :
         out_data = {}
+	# Specifying that the residual_numerical function should return the residuals, if called with flag=1 it returns the predicted egg laying rate.
+	flag = 0
         for key in data:
                 if key != 'times':
                         print key
                         parms = setParameters(default_parms)
-                        out_data[key] = minimize(residual_numerical, parms, method = int_method, args=(model, {key:data[key], 'times':data['times']}, integrator, delta_t))
+                        out_data[key] = minimize(residual_numerical, parms, method = int_method, args=(model, {key:data[key], 'times':data['times']}, integrator, delta_t,flag))
         return out_data
 
 
@@ -417,7 +431,8 @@ def calc_residuals(out):
                 if key != 'times':
                         sumsq += np.sum(out[key].residual*out[key].residual)
         print sumsq
-        
+	return sumsq
+        		
       
 def initial_analysis():
         default_params1 = {'ko': [12, True, 2, 50], 'kf': [.0004, False, .00000001, .01], 'kc': [0, False], 'ks': [.0001, False], 'S0':[300, False]}
@@ -475,7 +490,7 @@ def initial_analysis():
         out11 = fix_values(egglayingModel1, data, default_params2, ['kc', 'kf','ko'], 'leastsq', 'dopri', .1)
         calc_residuals(out11)
 
-def create_QTL_file(output, input_datafile, directory):
+def create_QTL_file(output, input_datafile, directory,model,initial_params,integrator,delta_t,total_residuals):
  
         varying_params = []
         output_data = {}
@@ -508,7 +523,7 @@ def create_QTL_file(output, input_datafile, directory):
 
         # Open the input file to keep the strains in the right order.
         f = csv.reader(open(input_datafile,'rU'))
-
+	
         # Open the output file and write out appropriate data
         outfile = directory + '/Modelled_phenotypes.csv'
         with open(outfile,'wb') as of:
@@ -516,14 +531,112 @@ def create_QTL_file(output, input_datafile, directory):
                 for row in f:
                         output_data[row[0]].insert(0,row[0])
                         csvfile.writerow(output_data[row[0]])
+	of.close()
 
+	# Print the log file 
+	logfile = directory + '/Modelled_phenotypes_qtllogfile'
+	with open(logfile,'wb') as of:
+		print >> of,"Model Used :",model,"\n"
+		print >> of,"Initial Parameters :",initial_params,"\n" 
+		print >> of,"Integrator Used :",integrator,"\n" 
+		print >> of,"Delta_t :",delta_t,"\n"
+		print >> of,"Total Residuals :",total_residuals,"\n"
+	of.close()
+
+def egglaying_plots(output,model_function,data,input_datafile,integrator,delta_t,final_time,directory):
+	""" Function to plot the estimated egg-laying rate obtained with the fitted parameters, There will be a total of 96 plots, 16 in each pdf. 
+	    output is the fit object returned by lmfit's minimize routine
+	    model_function is a function pointer to the egg-laying model to be used
+	    data is a hash keyed in with the strain vs data points and times vs experimental time points
+	    input_data file is the name of the file containing the strain names and their egg-laying rate at different time points
+	    integrator is the integrator we are using, viz. dopri,lsoda,etc.
+	    delta_t is the time increment specified for numerical intergration
+	    final_t is the final limit for the numerical integration
+	    directory is the output directory for the plots
+	"""
+	egglaying_rate = {}
+        # Create a the directory if it doesnt exist
+        if not os.path.exists(directory):
+		os.makedirs(directory)
+
+	# Call the residual_numerical function with flag=1 and store the returned value of egglaying rate in a hash with keys as the strains
+	# The parameters passed to this function are the ones which have been estimated by lmfit
+	# The function integrates the model with these parameters
+	for key in output:
+		params = output[key].params
+		egglaying_rate[key] = residual_numerical(params, model_function, {key:data[key], 'times':data['times']}, integrator, delta_t,flag=1)
+		
+	# Open the input file to keep the strains in the right order.
+	f = csv.reader(open(input_datafile,'rU'))
+	
+	# Time grid for the plots
+	t = np.arange(0,final_time,delta_t)
+	
+	i = 1
+	j = 1
+	# Plots
+        for row in f:
+		if(row[0]!='ID'):
+			if(i%16==1):
+				start_strain = row[0]
+				k = 1
+				plt.figure(j,figsize=(20,10))
+				j = j + 1
+
+                 	plot_title = row[0]
+			plt.subplot(4,4,k)
+			plt.title(plot_title)
+			plt.plot(t,egglaying_rate[row[0]])
+			plt.plot(data['times'], data[row[0]], marker = "o",linestyle = "--")
+			plt.xlabel('Time(in hrs)')
+			plt.ylabel('dE/dt')
+			plt.legend(loc=0)
+			if(i%16==0):
+				end_strain = row[0]
+				figure_name = "%s_to_%s" %(start_strain,end_strain)
+				plt.savefig(directory + "/" + figure_name)
+			k = k + 1
+			i = i + 1
+			
+def calc_svd(output,input_datafile,directory):
+	""" Function to calculate the Singular Value Decomposition for the residual matrix of our 96 strains. It is a 96x5 matrix
+	output is the fit object returned by lmfit's minimize routine
+	input_datafile is the name of the csv file containing the experimental egg-laying rates for the 96 strains
+	directory is the output directory we want to save the output files to
+	"""
+
+	## SVD Theorem states : 
+	## A(nxp) = U(nxn)S(nxp)Vtranspose(pxp)
+
+	# Initialize an empty 96x5 matrix for storing the SVDs
+	res_matrix = [[0 for i in range(5)] for j in range(96)]
+
+	f = csv.reader(open(input_datafile,'rU'))
+	i=0
+	for row in f:
+		if(row[0]!='ID'):
+			res_matrix[i] = output[row[0]].residual
+			i = i + 1
+	
+        #Create directory if needed
+	if not os.path.exists(directory):
+        	os.makedirs(directory)
+	
+	# Calculate the SVDs for the residual matrix
+	U, S, V = np.linalg.svd(res_matrix,full_matrices=True)
+
+        # Open the output file and write out appropriate data
+        outfile = directory + '/svd_residuals.csv'
+	
+	print U
+	print S
+	print V
 ########################################################################
 ##			     MAIN FUNCTION                            ##
 ########################################################################
-
 ## Globals
 final_t = 96
-input_data = '/Users/ptmcgrat/Downloads/Egglaying_Model.csv'
+input_data = 'Egglaying_Model.csv'
 ## Experimental File Input
 reader = csv.reader(open(input_data,'rU'))
 data = {}
@@ -544,6 +657,20 @@ data_small['ln70-7'] = data['ln70-7']
 
 #Run code
 #parms = setParameters(model1_params)
+print ""
+print "MODEL 1: With carrying capcity"
+default_params2 = {'ko': [12, True, 2, 50], 'kf': [.0004, True, .00000001, .01], 'kc': [0, True], 'ks': [.0001, False], 'S0':[300, False]}
+print default_params2
+#out4 = independent_fit(egglayingModel1, data, default_params2, 'leastsq', 'dopri', .1)
+#calc_residuals(out4)
+        
+print 'kf fixed'
+out5 = fix_values(egglayingModel1, data, default_params2, ['kf'], 'leastsq', 'lsoda', .1)
+tot_res = calc_residuals(out5)
+#model, parameter info, integrator, delta_t, total residuals
+create_QTL_file(out5, input_data, "./QTLData","EgglayingModel1",default_params2,'lsoda',.1,tot_res)
+egglaying_plots(out5,egglayingModel1,data,input_data,'dopri',.1,96,"./ModelPlots")
+calc_svd(out5,"Egglaying_Model.csv","./QTLData")
 
 #derivative_analyzer_analytic(parms, data_small)
 #derivative_analyzer(parms, data_small, egglayingModel1, 'dop853', .01)
@@ -561,7 +688,7 @@ data_small['ln70-7'] = data['ln70-7']
 
 
 
-
+"""
 print "analytical"
 model1_params = {'ko': [12, True, 2, 50], 'kf': [.0004, True, .00000001, .001], 'kc': [0, False], 'ks': [0, False], 'S0':[300, True, 250,500]}
 print 'kf fixed'
@@ -604,7 +731,7 @@ print 'kf fixed'
 #calc_residuals(out_dopri)
 #scatter_plot(out_a,out_dopri,'M1_VarykokfS0_analaticvsdopri')
 
-"""
+
 print "dopri .1"
 out_dopri = independent_fit(egglayingModel1, data, model1_params, 'leastsq', 'dopri', .1)
 calc_residuals(out_dopri)
