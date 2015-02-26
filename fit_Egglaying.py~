@@ -131,7 +131,7 @@ def residual_numerical(params, model_function, data, integrator, delta_t,flag=0)
 			pr_dEdt.extend([dEdt])
 
 	if(flag == 2):
-		return pr_data
+		return e_prime
 	elif(flag == 1):
 		return pr_dEdt
 	elif(flag == 0):
