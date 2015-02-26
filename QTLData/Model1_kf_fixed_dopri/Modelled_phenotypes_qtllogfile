@@ -1,0 +1,10 @@
+Model Used : EgglayingModel1 
+
+Initial Parameters : {'kc': [0, True], 'ks': [0.0001, False], 'S0': [300, False], 'ko': [12, True, 2, 50], 'kf': [0.0004, True, 1e-08, 0.01]} 
+
+Integrator Used : dopri 
+
+Delta_t : 0.1 
+
+Total Residuals : 1210.95705858 
+

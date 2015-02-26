@@ -41,14 +41,14 @@ par(mfrow=c(4,4))
 
 for(i in 1:(n_phenotypes-1))
 {
-		print(i)
+	print(i)
         plot(modelData.scan1a, lodcolumn = i)
         add.threshold(modelData.scan1a, perms = modelData.perm1a, alpha = 0.05, lodcolumn = i,col="black")
 }
 for(i in 1:(n_phenotypes-1))
 {
-		print(i)
-		plot(modelData.scan1b, modelData.scan1c, lodcolumn = i, gap = 5, ylim = c(0,4))
+	print(i)
+	plot(modelData.scan1b, modelData.scan1c, lodcolumn = i, gap = 5, ylim = c(0,4))
         add.threshold(modelData.scan1b, perms = modelData.perm1b, alpha = 0.05, lodcolumn = i,col="black")
         add.threshold(modelData.scan1c, perms = modelData.perm1c, alpha = 0.05, lodcolumn = i,col="blue") 
 }

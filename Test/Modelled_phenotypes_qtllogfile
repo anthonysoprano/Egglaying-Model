@@ -1,0 +1,8 @@
+Model Used : AnalyticalModel1 
+
+Initial Parameters : {'kc': [0, False], 'ks': [0, False], 'S0': [300, True, 250, 350], 'ko': [12, True, 2, 50], 'kf': [0.0004, True, 1e-08, 0.001]} 
+
+Delta_t : 0.1 
+
+Total Residuals : 175.054897816 
+
